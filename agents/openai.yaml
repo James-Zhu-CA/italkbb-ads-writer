@@ -1,0 +1,4 @@
+interface:
+  display_name: "iTalkBB Ads Writer"
+  short_description: "Generate web-verified ad copy and creative prompts"
+  default_prompt: "Use $italkbb-ads-writer to create Google, Facebook, or Xiaohongshu ads based on current italkbb.ca product pages."
