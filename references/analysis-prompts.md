@@ -55,6 +55,13 @@
 - `segment background`、`language & cultural background` 仅可作为补充维度字段，不能替代主键。
 - 若发现字段漂移（例如只写 `segment background`），当前步骤不得标记 `completed`，必须先修正。
 
+## 官网域名白名单（强制）
+
+- 默认官网事实域名白名单仅允许：`www.italkbb.ca`。
+- 涉及价格、优惠、原价、条款条件的 claim，默认不得使用 `italkbb.com` 作为证据来源。
+- 若用户明确要求核查 `italkbb.com`，必须在 Step 0 明确记录，并将 `.ca` 与 `.com` 的 claim/evidence 分开，不得混用。
+- Step 2 与 Step 7 若抓到白名单外 URL，不得用于事实结论；需标注 `domain_not_allowed`。
+
 ## Step 0 规划约束（强制）
 
 - 在 `step0-plan.md` 明确：
@@ -62,6 +69,7 @@
   - Step 1-6 中哪些要执行、哪些跳过、原因
   - 每一步需要读取的文档和依赖关系
   - 计划抓取的官网 URL 列表
+  - 允许的事实域名白名单（默认 `www.italkbb.ca`）
   - 计划使用的工具/手段（search/open/curl 等）
   - 页面展示类型判断（`static` 或 `interactive-variant`）
   - 若为 `interactive-variant`，列出 Step 2 和 Step 7 的变体遍历方案
@@ -89,6 +97,7 @@
   - claim 级验证
 - canonical 规则：
   - 产品投放任务 canonical 必须是产品页（例如 `.../chinese-tv-plans...`）
+  - 默认 canonical 必须位于 `www.italkbb.ca`
   - promotion/legal 页面仅作为 Step 2 辅助证据，不得在 Step 1 设为 canonical
 
 ## Step 2 输入分栏（强制）
@@ -97,6 +106,7 @@ Step 2 前半段必须完成并落盘：
 
 - 页面类型最终判定（`static` 或 `interactive-variant`）
 - 判定结果一旦写入 `step2-facts.md`，后续步骤不得改口径
+- 域名白名单执行结果（是否出现 `domain_not_allowed` 拒绝项）
 
 进入 Step 3 前，Step 2 必须把官网事实分为：
 
@@ -118,8 +128,10 @@ Step 2 必须新增 `Fetch Dedup Log`，字段至少包括：
 - `URL`
 - `fetched_at`
 - `purpose`
+- `allowed domain check` (`pass` / `fail`)
 
 同一步内不得对同一 URL 以同一 purpose 重复抓取；若因超时或 5xx 重试，需在日志写明原因。
+白名单外 URL 可抓取用于排除/对比记录，但不得进入事实结论与 claim 证据。
 
 Nuxt/JS 反查仅在以下条件同时满足时允许：
 
@@ -143,6 +155,13 @@ Nuxt/JS 反查仅在以下条件同时满足时允许：
   - 简体中文主导 -> 简体中文
   - 英文主导 -> English
 - Step 3 每类人群都要明确“常用语言 + 文案字体系（繁/简/英） + 语言与文化背景 + 语气提示”。
+- Step 3 每类人群都要定义 `Language Localization Profile`（供 Step 6 写作、Step 7 审计），至少包含：
+  - `target locale/style variant`
+  - `tone & formality`
+  - `wording preferences`
+  - `wording avoid list`
+  - `punctuation/style conventions`
+  - `sentence rhythm/style notes`
 - 不得在同一客群输出中混用繁体、简体、英文。
 - Step 3 到 Step 7 的跨步骤引用必须使用 `persona_id` 回链，不得仅按背景标签回链。
 
@@ -168,6 +187,7 @@ Nuxt/JS 反查仅在以下条件同时满足时允许：
   - `### Target Segment List`
   - `### Persona Candidate Matrix`
   - `### Core Audience Scoring`
+- `## Output` 必须额外包含：`### Language Localization Profile`（覆盖 `Target Segment List` 全部人群）。
 - 所有表格均写在 `step3-persona.md` 的 `## Output` 下，便于 Step 4 到 Step 6 直接引用。
 - 三个表中的 `persona_id` 必须一一对应；`Target Segment List` 仅保留本次需要继续处理的 persona。
 - 禁止用 `segment background` 列替代 `persona_id` 或 `behavior archetype`。
@@ -195,6 +215,9 @@ Nuxt/JS 反查仅在以下条件同时满足时允许：
 3. `### Core Audience Scoring`（表格）  
 字段至少包含：`persona_id`、`behavior archetype`、`segment size (1-5)`、`demand intensity (1-5)`、`conversion readiness (1-5)`、`weighted score`、`rank`、`core audience (yes/no)`、`reason`。  
 `weighted score` 默认公式：`size*0.3 + demand*0.4 + readiness*0.3`。
+4. `### Language Localization Profile`（表格）  
+字段至少包含：`persona_id`、`behavior archetype`、`language/script lock`、`target locale/style variant`、`tone & formality`、`wording preferences`、`wording avoid list`、`punctuation/style conventions`、`sentence rhythm/style notes`。  
+说明：该表是 Step 6 写作约束与 Step 7 审计基准，不是可选项。
 
 要求：
 1. 每一类画像需基于真实可感知的消费行为，而非泛泛而谈的人口标签。  
@@ -206,6 +229,7 @@ Nuxt/JS 反查仅在以下条件同时满足时允许：
 7. `core audience` 仅作为处理优先级标记，不得用于排除其他已入选人群。  
 8. `Target Segment List` 中的人群必须在 Step 4 到 Step 6 全部被处理，不得因优先级被跳过。
 9. 若输出单人群，也必须保留完整字段并仅输出 1 行 `persona_id`。
+10. `### Language Localization Profile` 必须覆盖 `Target Segment List` 全部人群，后续 Step 6/7 均按此表执行与审计。
 
 ## 2) 挖掘目标用户痛点、痒点、爽点的提示词（Step 4）
 
@@ -304,22 +328,31 @@ Nuxt/JS 反查仅在以下条件同时满足时允许：
 - 不得把不同变体价格混写在同一条主张里。
 - 不得把合约、额外费用、解约费用包装成卖点或正向利益。
 - 必须包含 `### Step5 Handoff Consumption`，逐条记录 Step 5 交接项是否被采用及原因。
-- 必须包含 `### Visual Creative Pack`，图文一体输出，不得只给文案不配图提示。
+- 必须包含 `### Visual Creative Pack`（可读摘要）和 `### Formatted Image Prompts`（机器可执行 YAML）；不得只给散文式“配图建议”。
 - 必须包含 `### Claim Inventory`（供 Step 7 直接复核），且使用表格输出。
 - `### Claim Inventory` 字段至少包含：  
   `claim_id`、`claim_text`、`asset_location`、`persona_id`、`behavior archetype`、`language/script`、`variant key/name`（如适用）、`source URL(s)`。
 - 必须包含 `### Claim to Variant Binding`，与 `### Claim Inventory` 的价格类 claim 一一对应。
 - 必须包含 `### Segment Coverage in Assets`，字段至少包含：`persona_id`、`behavior archetype`、`asset package generated (yes/no)`、`language/script match (yes/no)`、`notes`。
 - `### Step5 Handoff Consumption` 至少包含：`handoff_id`、`persona_id`、`status`、`used in asset`、`note`。
-- `### Visual Creative Pack` 必须按人群分组，且每组包含：
-  - `图片风格总指令`
-  - `图片清单（4-6张）`
-  - 每张图字段：`visual_id`、`slot`、`purpose`、`prompt`、`negative`、`overlay_text(<=10字建议)`、`claim_ref`
+- 必须包含 `### Language Localization Application`（逐人群说明如何应用 Step 3 本地化规则）。
+- 必须包含 `### Language Localization Self-Check`（逐人群自检，供 Step 7 审计）。
+- `### Formatted Image Prompts` 必须使用 fenced `yaml`，并按人群输出 block，结构固定为：
+  - `persona`
+  - `language`
+  - `archetype`
+  - `slots`（数组）
+- `slots` 中每个图片对象必须包含字段：  
+  `slot`、`purpose`、`人物`、`动作`、`场景`、`机位`、`光线`、`构图`、`道具`、`情绪`、`禁止项`、`prompt`、`negative`、`overlay`、`claim refs`。
+- 文本渲染约束（硬性）：
+  - 每个 slot 的 `prompt` 必须包含 `no readable text in generated image`
+  - 不得在 base image prompt 中要求渲染价格、套餐名、法务文字
+  - 价格/条件仅允许写入 `overlay`（中文建议 `<=10` 字）
+- 平台槽位规则（必须执行）：
+  - Xiaohongshu：每人群固定 `cover/pain/process/compare/result`，`detail` 可选
+  - Facebook：每人群固定 `hook/scenario/proof/offer/cta`（可按 3-5 张裁剪）
+  - Google：每人群固定 `offer/feature/trust/cta`（可按 3-5 张裁剪）
 - 必须包含 `### Image Prompt Variables`，字段固定为：`[产品] [核心卖点] [关键动作] [痛点] [目标人群画像] [使用场景] [结果状态] [犹豫点参数]`。
-- 平台微调规则（必须执行）：
-  - Xiaohongshu：默认 `3:4` 竖图，采用 `封面/痛点/过程/对比/结果/细节(可选)` 槽位。
-  - Facebook：默认 `4:5` 竖图（可补 `1:1`），采用 `hook/场景/证据/优惠/CTA` 槽位。
-  - Google：默认输出 `1:1 + 横版` 概念图，采用 `offer/feature/trust/CTA` 槽位，文字更克制。
 
 提示词：
 
@@ -328,30 +361,49 @@ Nuxt/JS 反查仅在以下条件同时满足时允许：
 请按以下步骤执行：
 1. 读取 `Step5 Handoff`，逐条判断采用与否，输出 `### Step5 Handoff Consumption`。  
 2. 基于已采用卖点，按 `Target Segment List` 逐人群生成 `### Platform Asset Package`（按本次平台需求输出对应资产，如 Google/Facebook/Xiaohongshu 文案与图视频提示词）。  
-3. 为每个人群输出 `### Visual Creative Pack`：图文一体，不少于 4 张图，按平台槽位组织，每张图都给出 Prompt + Negative + 叠字建议。  
-4. 对所有可验证主张建立 `### Claim Inventory`，用于 Step 7 定向复核。  
-5. 对价格与优惠主张输出 `### Claim to Variant Binding`，确保每条价格 claim 有唯一变体归属。  
-6. 输出 `### Segment Coverage in Assets`，确认 `Target Segment List` 全部人群均有对应文案与视觉资产。  
-7. 输出 `### Image Prompt Variables`（可替换占位变量）。  
-8. 若用户本次仅要求“买点文案”，可在末尾附加 `### Optional Buy-point Lines (10)`。
+3. 先输出 `### Visual Creative Pack`（可读摘要），再输出 `### Formatted Image Prompts`（fenced yaml）。  
+4. `### Formatted Image Prompts` 中每个 slot 必须写清：`人物/动作/场景/机位/光线/构图/道具/情绪/禁止项`，并给出 `prompt/negative/overlay/claim refs`。  
+5. 对所有可验证主张建立 `### Claim Inventory`，用于 Step 7 定向复核。  
+6. 对价格与优惠主张输出 `### Claim to Variant Binding`，确保每条价格 claim 有唯一变体归属。  
+7. 输出 `### Segment Coverage in Assets`，确认 `Target Segment List` 全部人群均有对应文案与视觉资产。  
+8. 输出 `### Language Localization Application`（逐人群列出采用的本地化规则、词汇偏好、避免词、风格选择）。  
+9. 输出 `### Language Localization Self-Check`（逐人群检查 locale/style、词汇避用、标点/句式风格是否符合 Step 3）。  
+10. 输出 `### Image Prompt Variables`（可替换占位变量）。  
+11. 结束前执行 Step 6 自检并在文末给出 `### Step6 Format Self-Check`（pass/fail + fail reason）：
+   - 是否包含 `### Formatted Image Prompts` + fenced `yaml`
+   - 是否每个人群都有 `persona/language/archetype/slots`
+   - 是否每个 slot 都有全部强制字段
+   - 若平台是 Xiaohongshu，是否齐全 `cover/pain/process/compare/result`
+   - 是否每个 `prompt` 都包含 `no readable text in generated image`
+   - 是否已输出 `### Language Localization Application` 与 `### Language Localization Self-Check`
 
 约束：
 - 文案语言/字体系必须遵循 Step 3 对应人群设定（繁/简/英）。  
+- 文案标题/正文/CTA/合规说明/图片叠字用词均须遵循 Step 3 `Language Localization Profile`，不得只做到“字体系正确”但词汇风格失配。  
 - 多人群任务必须分人群独立输出，不得混写。  
 - 每个事实主张都必须能追溯到 Step 2 官网 URL。  
 - 限制条件（合约/额外费用/解约费用等）只可放在合规说明，不得包装为卖点。  
 - 不得遗漏 `Target Segment List` 中任何人群。  
-- 视觉提示词必须与文案主张一致；若图中文字包含价格/条件，必须进 `Claim Inventory`。  
+- 视觉提示词必须与文案主张一致；若叠字包含价格/条件，必须进 `Claim Inventory`。  
 - 小红书视觉默认写实手机随手拍、低广告感；Facebook 与 Google 需按平台微调，不可直接复制同一套构图语法。  
+- 若平台是 Xiaohongshu，正文必须使用可复制到编辑器的纯文本排版：禁止 markdown/list bullets（`-`/`*`/`•`），改用分段 + `1）2）3）` 或 `第一/第二/第三`。
+- 若平台是 Xiaohongshu，允许使用表情但必须按场景选择类型（商务场景 vs 家庭场景），不得使用与场景不符的可爱风表情堆叠。
+- 禁止输出“封面图：xxx、痛点图：xxx”这类散文清单替代结构化 YAML。  
+- 若 `### Step6 Format Self-Check` 出现 fail，必须先修正再标记 Step 6 completed。  
 
 ## 5) 小红书种草爆文生成提示词（Step 6 平台专用）
 
 文档补充要求：
 
 - 平台为 Xiaohongshu 时，Step 6 必须在文件中追加 `## Xiaohongshu Template Output`。
+- 小红书标题默认 `<= 20` 个中文字（用户另有要求除外）。
 - 文案默认 `<= 400` 字（用户另有要求除外）。
-- 必须同步输出 `## Xiaohongshu Visual Creative Pack`，默认 4-6 张图，建议槽位：`封面/痛点/过程/对比/结果/细节(可选)`。
-- 每张图必须包含：`Prompt`、`Negative`、`叠字建议(<=10字)`，并标注 `claim_ref`（若出现可验证主张）。
+- 小红书正文必须为可复制进编辑器的纯文本排版：禁止 markdown/list bullets（`-`/`*`/`•`）。
+- 小红书正文表情允许使用，但必须低密度且按场景选型（见下方 `Attention`）。
+- 必须同步输出 `## Xiaohongshu Visual Creative Pack`（可读摘要）+ `### Formatted Image Prompts`（fenced yaml）。
+- Xiaohongshu 每个人群必须包含 `cover/pain/process/compare/result` 五个固定槽位（`detail` 可选）。
+- 每个槽位必须包含：`人物`、`动作`、`场景`、`机位`、`光线`、`构图`、`道具`、`情绪`、`禁止项`、`prompt`、`negative`、`overlay`、`claim refs`。
+- 每个槽位 `prompt` 必须包含：`no readable text in generated image`。
 
 Role: 小红书种草爆文生成器
 
@@ -369,6 +421,17 @@ Attention:
 - 以生活化、社交化、情绪化表达为主，符合小红书阅读与传播习惯。
 - 结合高频痛点，精准击中目标受众真实需求。
 - 卖点必须通过体验与细节呈现，不直接罗列。
+- 标题长度默认不超过 20 个中文字（用户另有要求除外）。
+- 正文排版默认使用“短段落 + 空行 + 中文序号（如 `1）2）3）`）”，不要使用 markdown/bullet 列表符，避免粘贴到小红书编辑器后格式丢失。
+- 表情使用规则（适配不同业务场景）：
+  - 允许使用表情，但默认低密度：标题 `0-1` 个，正文 `3-6` 个（约 300-400 字）。
+  - 表情用于“段首提示/情绪标记/场景提示”，不要把表情当 bullet 列表本体。
+  - 商务场景（如效率、服务、协作、流程）：用功能型表情（`📌✅⚠️💡📞⏱️`），避免可爱风。
+  - 家庭场景（日常使用、家庭成员、宠物、居家体验）：用家庭与安抚型表情（`🏠👨‍👩‍👧‍👦🧓👶🐶🐱💬`），突出安心感/生活感。
+  - 若段落语气是提醒/风险/异常提示（无论家庭或商务场景）：用低密度警示型表情（`🚨⚠️🌙🔔👀`），避免制造过度恐慌。
+  - 安装教程/选购对比/方案整理场景（家庭/商务均可）：用结构型表情（`1️⃣2️⃣3️⃣📝🔍📊`），强调步骤和比较。
+  - 涉及价格、合约、限制条件披露时：尽量不用表情；如需提示，仅用 `⚠️` 或 `📌` 一枚。
+  - 禁止在安全风险或合规披露段落使用过度活泼/可爱表情（如 `✨💕😍🥹`）以免削弱可信度。
 - 图片风格默认：写实手机随手拍、生活方式、自然光、轻微颗粒、低广告感、3:4 竖图优先。
 - 默认图片槽位建议：
   - 封面图：场景+情绪+结果暗示
@@ -391,14 +454,18 @@ Attention:
   - 若 Step 6 不存在或无清单，则根据待复核文案内容直接抽取 claim 复核（可参考 Step 2 的 claim inventory）。
 - 根据 claim 清单构建“定向复抓 URL 集”，仅抓取核验该批 claim 所需 URL。
 - 禁止在 Step 7 做全站扩散搜索。
+- 默认仅允许 `www.italkbb.ca` 进入复核 URL 集；白名单外 URL 需拒绝并记录 `domain_not_allowed`。
 - 证据冲突时使用统一优先级：`产品 canonical 页 > 产品变体 payload/endpoint > promotion 页 > legal/其他页`。
 - 必须输出 `### Step7 Fetch Dedup Log`，字段至少包含：`URL`、`fetched_at`、`purpose`、`retry_count`、`retry_reason`。
+- 建议增加字段：`allowed domain check`（`pass/fail`）。
 - 同一步内不得对同一 URL 同一 purpose 重复抓取；若超时/5xx，可重试但需入日志。
 - 重试策略：超时或 5xx 最多重试 2 次。
 - 逐条核查复核清单中的每个事实主张。
 - 增加语种一致性核查：文案语种/字体系必须与 Step 3 对应人群的语种锁定一致。
+- 增加语言本地化审计：按 Step 3 `Language Localization Profile` 检查词汇地域性、语气正式度、标点与句式风格是否一致（Step 7 只审计，不负责主写）。
 - 对 `interactive-variant` 页面，必须先切到对应变体状态，再核查该条主张。
 - 必须增加 `### Segment Coverage Audit`：核对 Step 3 `Target Segment List` 的每个 persona 在 Step 6 是否存在对应资产包且语种匹配。
+- 必须增加 `### Language Localization Audit`：逐人群审计 Step 6 是否按 Step 3 本地化规则执行。
 - 若 Step 6 含视觉提示词，必须增加 `### Visual Prompt Audit`：逐条核查视觉提示中的事实主张与叠字文案。
 - 表格输出字段：
   - `claim_id`（若 Step 6 存在，需与 `Claim Inventory` 对齐）
@@ -422,6 +489,17 @@ Attention:
   - `language/script match` (`yes/no`)
   - `status` (`pass` / `fail`)
   - `action taken`
+- `### Language Localization Audit` 表格字段至少包含：
+  - `persona_id`
+  - `behavior archetype`
+  - `target locale/style variant`（from Step 3）
+  - `checked assets/sections`
+  - `script lock check` (`pass/fail`)
+  - `locale wording check` (`pass/fail`)
+  - `punctuation/style check` (`pass/fail`)
+  - `issue summary`
+  - `status` (`pass/fail`)
+  - `action taken`
 - `### Visual Prompt Audit` 表格字段至少包含：
   - `visual_id`
   - `slot`
@@ -437,4 +515,5 @@ Attention:
 - 若存在 `not found` 或 `mismatch`：
   - 有 Step 6 时：先修改 Step 6，再重新执行 Step 7。
   - 无 Step 6 时：输出修正文案建议，并基于修正后 claim 重新执行 Step 7。
+- 若本地化审计 fail：先回到 Step 6 修正文案，再重新执行 Step 7；Step 7 不直接重写整段文案。
 - Step 7 自动复核回路最多执行 2 轮；仍未解决的条目标记为 `manual review required`。

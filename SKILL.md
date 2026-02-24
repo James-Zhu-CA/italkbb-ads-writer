@@ -83,7 +83,21 @@ For steps with price claims on interactive pages, add:
 - Pre-completion gate:
   - Step 3 cannot be marked `completed` if any required table misses `persona_id` + `behavior archetype`.
   - Step 4 to Step 7 cannot be marked `completed` if persona references do not map back to Step 3 `Target Segment List`.
-  - If schema mismatch is found, fix current step artifact before moving to next step.
+- If schema mismatch is found, fix current step artifact before moving to next step.
+
+## Official Source Domain Guard (Mandatory)
+
+- Default official fact source domain for this skill is `www.italkbb.ca` only.
+- For price, promotion, original price, and conditions claims:
+  - allow sources under `https://www.italkbb.ca/...` only
+  - reject `italkbb.com` pages as evidence by default to avoid cross-site price mismatch
+- `italkbb.com` may be used only when the user explicitly requests `.com` market verification, and `.ca` / `.com` facts must be kept in separate claim sets and outputs.
+- Step 0 must record `Allowed Fact Domains` in `step0-plan.md`.
+- Step 1 canonical URL rule extension:
+  - canonical product page must be under `www.italkbb.ca` unless user explicitly requests another domain
+- Step 2 and Step 7 hard gate:
+  - if fetched evidence URL is outside allowed fact domains, do not use it for claim validation
+  - record it as rejected evidence in tool trace or fetch notes with reason `domain_not_allowed`
 
 ## Mandatory Workflow
 
@@ -108,6 +122,7 @@ For steps with price claims on interactive pages, add:
   - required documents and dependencies
   - execution queue (`Step 0 -> selected optional steps -> Step 7`)
   - official source URL list to be fetched
+  - allowed fact domains
   - tool strategy
   - page display type status (`pending`)
   - variant traversal checklist for Step 2 and Step 7
@@ -162,14 +177,22 @@ For steps with price claims on interactive pages, add:
   - Simplified Chinese dominant -> Simplified Chinese
   - English dominant -> English
 - For each selected persona, explicitly define common language, language/cultural background, and script lock in Step 3 output.
+- For each selected persona, Step 3 must also define a `Language Localization Profile` for downstream writing, including at minimum:
+  - target locale/style variant (for example: HK-style Traditional Chinese / TW-style Traditional Chinese / Mainland-style Simplified Chinese / English business plain style)
+  - tone + formality level
+  - wording preferences (preferred terms/phrasing)
+  - wording avoid list (cross-region or unnatural terms to avoid)
+  - punctuation and formatting conventions
+  - sentence rhythm/style notes (short/direct vs narrative/warm)
 - Do not mix Traditional Chinese, Simplified Chinese, and English in one persona output package.
 - If Step 1 has preferred segment, include it as a priority candidate in Step 3 comparison; do not auto-select it as core.
-- If Step 3 is selected, Step 6 language lock must follow Step 3 selected persona(s). For multi-persona output, generate one language-locked package per persona.
+- If Step 3 is selected, Step 6 language lock and localization rules must follow Step 3 selected persona(s). For multi-persona output, generate one language-locked package per persona.
 
 ### Step 2: Extract Latest Website Facts
 
 - Execute only if selected in Step 0.
 - Fetch facts from official pages confirmed in Step 1.
+- Enforce `Allowed Fact Domains` from Step 0 before any fact extraction.
 - Finalize page display type in Step 2 first half and lock it for downstream steps:
   - `static`: price visible directly in page content
   - `interactive-variant`: price changes only after selecting package or option
@@ -214,6 +237,7 @@ For steps with price claims on interactive pages, add:
 - Use `persona_id` + `behavior archetype` as the only primary persona keys in all Step 3 tables.
 - If user specifies a preferred target segment in Step 1, mark it as priority candidate and include it in the matrix comparison.
 - Label each persona with common language, language/cultural background, and language/script lock.
+- Define one explicit `Language Localization Profile` per selected persona for Step 6 and Step 7 audit.
 - Define and write `Target Segment List` (all personas that must be processed in Step 4 to Step 6).
 - Do not use `excluded` marker for selected target personas.
 - Select core audience with explicit comparison model including:
@@ -225,6 +249,7 @@ For steps with price claims on interactive pages, add:
   - default to top 3 personas unless single-segment processing is explicitly requested by user
   - `core audience` remains priority marker only
 - For single-segment processing, still keep full schema with exactly one selected `persona_id`.
+- `step3-persona.md` must include `### Language Localization Profile` (table or persona blocks) for all personas in `Target Segment List`.
 - Write artifact to `workflow/<run-id>/step3-persona.md`.
 
 ### Step 4: Identify Pain / Itch / Delight Points
@@ -269,6 +294,7 @@ For steps with price claims on interactive pages, add:
 - If platform is Xiaohongshu, also call template `5) 小红书种草爆文生成提示词（平台专用）`.
 - Must consume `Step5 Handoff` as primary writing input and record adoption/rejection for each handoff item.
 - Generate final copy and creative prompts using selected selling points and Step 3 persona language lock.
+- Apply Step 3 `Language Localization Profile` to all persona outputs (title, body copy, CTA wording, compliance note wording, image overlays).
 - For multi-segment delivery, output separate language-locked copy packages by persona.
 - Must generate corresponding copy package for every persona in Step 3 `Target Segment List`.
 - Build visual prompts and copy as one integrated asset package; visuals cannot be detached from persona + scenario + claim context.
@@ -280,22 +306,72 @@ For steps with price claims on interactive pages, add:
   - Xiaohongshu: `4-6` images per persona with fixed slots `cover / pain / process / compare / result / detail(optional)`.
   - Facebook: `3-5` images per persona, tuned for feed conversion flow `hook / scenario / proof / offer / CTA`.
   - Google: `3-5` images per persona, tuned for compliant ad clarity `offer / feature / trust / CTA`.
-- For every image slot, include:
-  - purpose
-  - prompt
-  - negative prompt
-  - overlay text suggestion (`<=10` characters preferred for Chinese scripts)
-  - claim refs (if factual text is used)
+- For every image slot, include these mandatory fields:
+  - `slot`
+  - `purpose`
+  - `人物`
+  - `动作`
+  - `场景`
+  - `机位`
+  - `光线`
+  - `构图`
+  - `道具`
+  - `情绪`
+  - `禁止项`
+  - `prompt`
+  - `negative`
+  - `overlay`
+  - `claim refs` (if factual text is used)
+- Formatted image prompt output lock (mandatory):
+  - output image prompts under `### Formatted Image Prompts` as fenced `yaml`
+  - one persona block per persona with keys:
+    - `persona`
+    - `language`
+    - `archetype`
+    - `slots` (array of slot objects using all mandatory fields above)
+  - use concrete, camera-executable descriptions; avoid abstract marketing-only language
+  - each slot must focus on one scene and one key action
+- Text rendering policy for image generation:
+  - base image prompts must request `no readable text in generated image`
+  - do not ask model to render price digits, package names, or legal terms inside the image
+  - all promotional wording and prices must be delivered via `overlay` only
+  - Chinese overlay text should be concise (`<=10` characters preferred)
+- Xiaohongshu body copy formatting (copy-paste safe):
+  - do not use markdown/list bullets in正文 (`-`, `*`, `•`)
+  - use plain-text short paragraphs + line breaks for readability
+  - when listing points, use copy-safe Chinese enumeration such as `1）2）3）` or `第一/第二/第三`
+  - prefer line-leading labels like `先说结论：` `我会先看这3点：` `最后说重点：`
+- Xiaohongshu emoji policy (scene-based, optional but recommended):
+  - use emoji as paragraph/section cues, not as markdown bullet substitutes
+  - keep density low-to-medium (`3-6` emojis per post by default; `0-1` in title)
+  - choose emoji type by scenario:
+    - business scenarios (service/efficiency/workflow): functional emojis (`📌✅⚠️💡📞⏱️`)
+    - family scenarios (daily use/home/family members/pets): warm reassurance emojis (`🏠👨‍👩‍👧‍👦🧓👶🐶🐱💬`)
+    - if the paragraph tone is alert/risk/reminder (in either family or business scenario), use caution-alert emojis sparingly (`🚨⚠️🌙🔔👀`)
+    - setup / comparison / buying guide scenarios (both family/business): structure-guide emojis (`1️⃣2️⃣3️⃣`, `📝`, `🔍`, `📊`)
+  - avoid playful/over-cute emoji clusters in risk/compliance-heavy scenes (`✨💕😍🥹` etc.)
+  - if a paragraph contains compliance/price/condition disclosure, prefer no emoji or one neutral cue only (`⚠️` / `📌`)
+- Step 6 pre-completion gate (hard):
+  - do not mark Step 6 `completed` unless `### Formatted Image Prompts` exists and is fenced `yaml`
+  - every selected persona must have one yaml block with `persona/language/archetype/slots`
+  - every slot object must contain all mandatory slot fields listed above
+  - for Xiaohongshu, each persona must include slots `cover/pain/process/compare/result` (`detail` optional)
+  - base prompt text in each slot must include `no readable text in generated image`
+  - for Xiaohongshu body copy, no markdown/list bullets in正文; use copy-paste-safe plain-text formatting
+  - if Xiaohongshu正文 uses emoji, emoji type and density must match scenario (family vs business)
 - Add one reusable placeholder block for visuals:
   - `[产品] [核心卖点] [关键动作] [痛点] [目标人群画像] [使用场景] [结果状态] [犹豫点参数]`
 - `step6-platform-copy.md` must include:
   - `### Step5 Handoff Consumption`
   - `### Platform Asset Package`
+  - `### Language Localization Application`
   - `### Visual Creative Pack`
+  - `### Formatted Image Prompts`
   - `### Image Prompt Variables`
   - `### Claim Inventory`
   - `### Claim to Variant Binding`
   - `### Segment Coverage in Assets`
+  - `### Language Localization Self-Check`
 - `### Claim Inventory` is mandatory for Step 7 and must include, at minimum:
   - claim id
   - claim text
@@ -306,18 +382,30 @@ For steps with price claims on interactive pages, add:
   - variant key/name (if applicable)
   - source URL(s)
 - Do not replace `persona id` / `behavior archetype` with background-only labels.
+- `### Language Localization Application` must record, per persona:
+  - Step 3 localization profile used
+  - key wording choices adopted
+  - wording choices rejected/avoided
+  - notable localization tradeoffs (if any)
+- `### Language Localization Self-Check` must confirm:
+  - script lock match
+  - locale/style variant match
+  - wording avoid list not violated
+  - punctuation/style conventions applied
 - Write artifact to `workflow/<run-id>/step6-platform-copy.md`.
 
 ### Step 7: Fresh Official Fact-Check and Delivery (Mandatory)
 
 - Always execute Step 7, even if some of Step 1 to Step 6 are skipped.
 - Re-fetch latest official pages directly from website in current run.
+- Enforce `Allowed Fact Domains` from Step 0 for all fresh verification fetches.
 - Do not use Step 2 to Step 6 artifacts as final evidence source.
 - Determine claim source dynamically:
   - If Step 6 exists and includes claim list/binding, use Step 6 claim list.
   - If Step 6 does not exist or has no claim list, extract claims directly from content under review (user-provided copy, optionally supported by Step 2 claim inventory).
 - Build a targeted verification URL set from selected claims and fetch only required URLs.
 - Avoid broad site-wide search in Step 7.
+- Reject any verification URL outside `Allowed Fact Domains` unless user explicitly requested that domain in Step 0.
 - If Step 6 includes visual prompts, audit visual claims and text overlays in the same run.
 - Apply source priority rule when evidence conflicts:
   - product canonical page > product interactive variant payload/endpoint > promotion page > legal/other page
@@ -333,6 +421,7 @@ For steps with price claims on interactive pages, add:
   - record retries in `Step7 Fetch Dedup Log`
 - Validate each selected claim against freshly fetched official content.
 - Validate language/script consistency against Step 3 persona language lock policy.
+- Audit language localization consistency against Step 3 `Language Localization Profile` and Step 6 `Language Localization Self-Check` (audit-only in Step 7; rewrite happens in Step 6).
 - For `interactive-variant` pages, re-enter matching variant state for each claim before validation.
 - Validate segment coverage consistency: every Step 3 target persona must have corresponding Step 6 asset package.
 - Validate visual coverage consistency: every Step 6 visual slot that includes factual wording must map to claim ids and be rechecked against fresh official evidence.
@@ -359,6 +448,18 @@ For steps with price claims on interactive pages, add:
   - status (`pass` / `fail`)
   - action taken
 - `Segment Coverage Audit` must use Step 3 `persona_id` + `behavior archetype` keys.
+- Also include `Language Localization Audit` table:
+  - persona id
+  - behavior archetype
+  - target locale/style variant (from Step 3)
+  - checked assets/sections
+  - script lock check (`pass/fail`)
+  - locale wording check (`pass/fail`)
+  - punctuation/style check (`pass/fail`)
+  - issue summary
+  - status (`pass/fail`)
+  - action taken
+- Step 7 is audit-only for localization; if localization fails, revise Step 6 and rerun Step 7.
 - If Step 6 contains visual prompts, also include `Visual Prompt Audit` table:
   - visual id / slot
   - persona id
@@ -406,7 +507,16 @@ For steps with price claims on interactive pages, add:
 
 - Use natural peer tone with strong "活人感".
 - Prefer scene-based storytelling plus practical benefits.
+- Enforce title length: `<= 20` Chinese characters unless user explicitly requests otherwise.
 - Enforce `<= 400` Chinese characters unless user asks otherwise.
+- Body formatting must be copy-paste safe for Xiaohongshu editor:
+  - no markdown/list bullets (`-`, `*`, `•`) in正文
+  - use paragraph breaks + Chinese enumerators (`1）2）3）` / `第一、第二、第三`)
+- Emoji usage is allowed and should be scenario-based:
+  - business posts: functional cues only (`📌✅⚠️💡📞⏱️`)
+  - family posts: warm home/family cues; if reminder/alert tone is needed, add light alert cues (`🏠👨‍👩‍👧‍👦🧓👶🐶🐱🔔`)
+  - alert/risk paragraphs (any scenario): sparse caution-alert cues (`🚨⚠️🌙👀`)
+  - avoid dense cute-style emoji in risk/compliance-heavy copy
 - Always apply template `5) 小红书种草爆文生成提示词（平台专用）`.
 - Visual direction: smartphone candid look, low-ad feel, default `3:4` portrait, and use `cover/pain/process/compare/result` slot logic.
 
@@ -434,12 +544,14 @@ For steps with price claims on interactive pages, add:
 - Claim to Variant Binding
 - Segment Coverage in Assets
 - Visual Creative Pack
+- Formatted Image Prompts (YAML)
 - Image Prompt Variables
 - Image Generation Prompts
 - Video Generation Prompts
 - Step7 Fetch Dedup Log
 - Fact Check (from Step 7 fresh official comparison)
 - Segment Coverage Audit (Step 7)
+- Language Localization Audit (Step 7)
 - Visual Prompt Audit (Step 7, if Step 6 has visual prompts)
 - Mismatch Reason Summary
 - Unverified or Removed Claims
