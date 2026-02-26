@@ -99,6 +99,25 @@ For steps with price claims on interactive pages, add:
   - if fetched evidence URL is outside allowed fact domains, do not use it for claim validation
   - record it as rejected evidence in tool trace or fetch notes with reason `domain_not_allowed`
 
+## Locked Business URL Registry and Cache (Mandatory for Listed Businesses)
+
+- For the listed iTalkBB businesses in `references/business-url-registry.json`, do not search for product URLs in Step 0 or Step 1.
+- Use the locked registry entry (`business_id` + locale) to map canonical/auxiliary official URLs.
+- Registry policy:
+  - user-locked `chs` URLs are the authoritative starting point
+  - `cht` / `en` URLs may be auto-discovered from the `chs` page language switch and persisted back into the registry
+- Cache root for website snapshots is the workspace project root `business_info/` directory.
+- Use `scripts/business_info_cache.py` to fetch/cache listed business pages.
+- Cache TTL default is 7 days:
+  - if cache age is `<= 7` days, Step 2 may reuse cache
+  - if cache age is `> 7` days, refresh from website before use
+- Step 7 hybrid freshness rule (user-approved):
+  - price / promotion / original price / conditions claims must force-refresh official website in the current run (do not rely only on 7-day cache)
+  - feature/spec/general descriptive claims may reuse `<= 7` day cache
+- `monthly_promotion` is an auxiliary promotion source and may conflict with product page pricing:
+  - record source page per price claim
+  - if conflict exists, mark `price_conflict` and surface warning; do not silently merge or overwrite claims
+
 ## Mandatory Workflow
 
 ### Step 0: Dynamic Plan Initialization
@@ -111,7 +130,10 @@ For steps with price claims on interactive pages, add:
 - Build document dependency map for this run:
   - which step file depends on which prior files
   - which official URLs must be fetched
+  - whether request matches a locked business in `references/business-url-registry.json`
+  - selected business_id and locale (if registry hit)
   - which tools/methods are needed (for example search/open/curl)
+  - cache strategy (`business_info/` path, 7-day TTL, Step 7 price/promo force-refresh exception)
   - page display type status (`pending` in Step 0, finalize in Step 2)
   - variant traversal strategy draft for possible interactive pages
 - Output `workflow/<run-id>/step0-plan.md` with:
@@ -123,6 +145,8 @@ For steps with price claims on interactive pages, add:
   - execution queue (`Step 0 -> selected optional steps -> Step 7`)
   - official source URL list to be fetched
   - allowed fact domains
+  - locked business registry match (`yes/no`) and `business_id` / locale (if matched)
+  - cache root path and cache policy summary
   - tool strategy
   - page display type status (`pending`)
   - variant traversal checklist for Step 2 and Step 7
@@ -135,6 +159,7 @@ For steps with price claims on interactive pages, add:
 - Allowed actions in Step 1:
   - identify requested platform and output format
   - identify product/service and map canonical product page URL
+  - for listed businesses, map URLs from `references/business-url-registry.json` instead of search
   - confirm target audience and output quantity
   - run lightweight URL availability check
 - Prohibited actions in Step 1:
@@ -193,6 +218,8 @@ For steps with price claims on interactive pages, add:
 - Execute only if selected in Step 0.
 - Fetch facts from official pages confirmed in Step 1.
 - Enforce `Allowed Fact Domains` from Step 0 before any fact extraction.
+- For listed businesses, call `scripts/business_info_cache.py` first and use `business_info/` cache with 7-day TTL.
+- Record cache decision (`hit` / `miss` / `stale_refresh`) in Step 2 fetch notes.
 - Finalize page display type in Step 2 first half and lock it for downstream steps:
   - `static`: price visible directly in page content
   - `interactive-variant`: price changes only after selecting package or option
@@ -202,6 +229,9 @@ For steps with price claims on interactive pages, add:
   - URL
   - fetched_at
   - purpose
+  - allowed domain check (`pass` / `fail`)
+  - cache status (`hit` / `miss` / `stale_refresh`)
+  - cache file path (if used)
 - Within Step 2, do not fetch same URL repeatedly for same purpose.
 - If repeated fetch is unavoidable (timeout/5xx), record reason in `Fetch Dedup Log`.
 - Extract:
@@ -397,7 +427,10 @@ For steps with price claims on interactive pages, add:
 ### Step 7: Fresh Official Fact-Check and Delivery (Mandatory)
 
 - Always execute Step 7, even if some of Step 1 to Step 6 are skipped.
-- Re-fetch latest official pages directly from website in current run.
+- Apply current-run official verification retrieval with hybrid freshness:
+  - price/promotion/original price/conditions claims -> force-refresh official website in current run
+  - non-price feature/spec claims -> cache reuse allowed when `business_info/` cache age is `<= 7` days
+  - any cache older than 7 days -> refresh before use
 - Enforce `Allowed Fact Domains` from Step 0 for all fresh verification fetches.
 - Do not use Step 2 to Step 6 artifacts as final evidence source.
 - Determine claim source dynamically:
@@ -413,18 +446,22 @@ For steps with price claims on interactive pages, add:
   - URL
   - fetched_at
   - purpose
+  - allowed domain check (`pass` / `fail`)
+  - cache status (`hit` / `miss` / `stale_refresh` / `force_refresh`)
+  - cache file path (if used)
+  - freshness basis (`forced website refresh` / `cache<=7d` / `cache>7d refreshed`)
   - retry_count
   - retry_reason (if any)
 - Within Step 7, do not fetch the same URL repeatedly for the same purpose.
 - Retry strategy for transient failures:
   - at most 2 retries for timeout/5xx
   - record retries in `Step7 Fetch Dedup Log`
-- Validate each selected claim against freshly fetched official content.
+- Validate each selected claim against current-run official evidence (forced fresh website retrieval for price/promo/conditions; cache<=7d allowed for non-price features/specs).
 - Validate language/script consistency against Step 3 persona language lock policy.
 - Audit language localization consistency against Step 3 `Language Localization Profile` and Step 6 `Language Localization Self-Check` (audit-only in Step 7; rewrite happens in Step 6).
 - For `interactive-variant` pages, re-enter matching variant state for each claim before validation.
 - Validate segment coverage consistency: every Step 3 target persona must have corresponding Step 6 asset package.
-- Validate visual coverage consistency: every Step 6 visual slot that includes factual wording must map to claim ids and be rechecked against fresh official evidence.
+- Validate visual coverage consistency: every Step 6 visual slot that includes factual wording must map to claim ids and be rechecked against current-run official evidence (price/conditions fresh refresh; non-price may use cache<=7d).
 - Write `workflow/<run-id>/step7-fact-check.md` with claim-level table:
   - claim id (must map to Step 6 `Claim Inventory` when available)
   - claim
@@ -459,7 +496,7 @@ For steps with price claims on interactive pages, add:
   - issue summary
   - status (`pass/fail`)
   - action taken
-- Step 7 is audit-only for localization; if localization fails, revise Step 6 and rerun Step 7.
+- Step 7 is audit-only for localization; if localization fails, record warning and suggested revision, but do not auto-rewrite Step 6 copy in Step 7.
 - If Step 6 contains visual prompts, also include `Visual Prompt Audit` table:
   - visual id / slot
   - persona id
@@ -470,11 +507,22 @@ For steps with price claims on interactive pages, add:
   - fetched_at
   - status (`verified` / `not found` / `mismatch`)
   - action taken
+- If any claim has `not found` / `mismatch`, also include `Conflict Notice` table:
+  - claim id (if available)
+  - claim
+  - conflict type
+  - affected output section
+  - evidence source A
+  - evidence source B (`N/A` if none)
+  - recommended handling
+  - user-visible warning message
 - If `not found` or `mismatch` exists:
-  - if Step 6 exists, update Step 6 copy and rerun Step 7
-  - if Step 6 does not exist, output corrected claim suggestions in Step 7 and rerun verification on revised claims when provided
-  - deliver only after unresolved claims are removed or corrected.
-- Maximum rerun loop for Step 7 is 2 cycles per run; if still unresolved, mark remaining items as `manual review required` and stop auto-rerun.
+  - do not auto-edit Step 6 copy in Step 7
+  - keep original generated copy unchanged
+  - add explicit conflict/warning notes in Step 7 (including `price_conflict` source URLs and mismatch reason)
+  - if user requests revision, revise in a new Step 6 pass and then rerun Step 7
+  - delivery may proceed with warning flags when user asked for review/reporting, but unresolved claims must be clearly marked `manual review required`
+- Do not auto-rerun Step 7 for content conflicts/mismatches; only retry transient fetch failures (timeout/5xx) within the same Step 7 run.
 
 ## Codex Tooling and MCP Contract
 
@@ -549,7 +597,7 @@ For steps with price claims on interactive pages, add:
 - Image Generation Prompts
 - Video Generation Prompts
 - Step7 Fetch Dedup Log
-- Fact Check (from Step 7 fresh official comparison)
+- Fact Check (from Step 7 current-run official comparison with hybrid freshness policy)
 - Segment Coverage Audit (Step 7)
 - Language Localization Audit (Step 7)
 - Visual Prompt Audit (Step 7, if Step 6 has visual prompts)
@@ -559,5 +607,6 @@ For steps with price claims on interactive pages, add:
 ## References
 
 - Use `references/analysis-prompts.md` for template execution guidance.
-- Use fresh official website retrieval in Step 7 as final verification source.
+- Use Step 7 current-run official evidence as final verification source (price/promo/conditions force refresh; non-price claims may use cache<=7d).
+- Use `references/business-url-registry.json` + `scripts/business_info_cache.py` for locked business URL mapping and `business_info/` cache management.
 - Optional local schema check tool: `scripts/validate_artifacts.sh workflow/<run-id>`.

@@ -1,0 +1,171 @@
+{
+  "version": "1.0.0",
+  "default_ttl_days": 7,
+  "default_domain": "www.italkbb.ca",
+  "notes": [
+    "Locked business URL registry for iTalkBB Canada pages. For listed businesses, do not search for product URLs in Step 0/Step 1.",
+    "chs URLs are user-locked. cht/en URLs may be auto-discovered from the chs page language switch and then persisted into this registry."
+  ],
+  "businesses": [
+    {
+      "business_id": "monthly_promotion",
+      "business_name": {
+        "chs": "最新优惠页面",
+        "cht": "最新優惠頁面",
+        "en": "Monthly Promotion"
+      },
+      "category": "promotion",
+      "update_cadence": "monthly",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/monthly_promotion",
+        "cht": "https://www.italkbb.ca/cht/monthly_promotion",
+        "en": "https://www.italkbb.ca/en/monthly_promotion"
+      }
+    },
+    {
+      "business_id": "home_phone_plans",
+      "business_name": {
+        "chs": "家居电话业务",
+        "cht": "家居電話業務",
+        "en": "Home Phone Plans"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/home-phone-plans",
+        "cht": "https://www.italkbb.ca/cht/home-phone-plans",
+        "en": "https://www.italkbb.ca/en/home-phone-plans"
+      }
+    },
+    {
+      "business_id": "prime_home_app",
+      "business_name": {
+        "chs": "多号码APP",
+        "cht": "多號碼APP",
+        "en": "Prime Home App"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/Prime_Home",
+        "cht": "https://www.italkbb.ca/cht/Prime_Home",
+        "en": "https://www.italkbb.ca/en/Prime_Home"
+      }
+    },
+    {
+      "business_id": "datak_travel_data",
+      "business_name": {
+        "chs": "旅游数据卡",
+        "cht": "旅遊數據卡",
+        "en": "Travel Data SIM"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/Datak",
+        "cht": "https://www.italkbb.ca/cht/DataK",
+        "en": "https://www.italkbb.ca/en/DataK"
+      }
+    },
+    {
+      "business_id": "china_sim",
+      "business_name": {
+        "chs": "中国手机卡",
+        "cht": "中國手機卡",
+        "en": "China SIM"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/ChinaSIM",
+        "cht": "https://www.italkbb.ca/cht/ChinaSIM",
+        "en": "https://www.italkbb.ca/en/ChinaSIM"
+      }
+    },
+    {
+      "business_id": "chinese_tv_plans",
+      "business_name": {
+        "chs": "中文电视",
+        "cht": "中文電視",
+        "en": "Chinese TV Plans"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/chinese-tv-plans",
+        "cht": "https://www.italkbb.ca/cht/chinese-tv-plans",
+        "en": "https://www.italkbb.ca/en/chinese-tv-plans"
+      }
+    },
+    {
+      "business_id": "aijia_battery_camera",
+      "business_name": {
+        "chs": "电池版AIjia智能安防摄像头",
+        "cht": "電池版AIjia智能安防攝像頭",
+        "en": "AIjia Battery Camera"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/aijiaSG",
+        "cht": "https://www.italkbb.ca/cht/aijiaSG",
+        "en": "https://www.italkbb.ca/en/aijiaSG"
+      }
+    },
+    {
+      "business_id": "aijia_plug_in_camera",
+      "business_name": {
+        "chs": "插电版AIjia智能安防摄像头",
+        "cht": "插電版AIjia智能安防攝像頭",
+        "en": "AIjia Plug-in Camera"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/homesecurity",
+        "cht": "https://www.italkbb.ca/cht/homesecurity",
+        "en": "https://www.italkbb.ca/en/homesecurity"
+      }
+    },
+    {
+      "business_id": "aijia_sensors_alarm",
+      "business_name": {
+        "chs": "门窗及动作感应器",
+        "cht": "門窗及動作感應器",
+        "en": "AIjia Sensors and Alarm System"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/AIjia-Smart-Home-Alarm-System",
+        "cht": "https://www.italkbb.ca/cht/AIjia-Smart-Home-Alarm-System",
+        "en": "https://www.italkbb.ca/en/AIjia-Smart-Home-Alarm-System"
+      }
+    },
+    {
+      "business_id": "aijia_management_system",
+      "business_name": {
+        "chs": "AIjia安防管理系统",
+        "cht": "AIjia安防管理系統",
+        "en": "AIjia Security Management System"
+      },
+      "category": "product",
+      "update_cadence": "variable",
+      "cache_ttl_days": 7,
+      "urls": {
+        "chs": "https://www.italkbb.ca/chs/aijiaManagement",
+        "cht": "https://www.italkbb.ca/cht/aijiaManagement",
+        "en": "https://www.italkbb.ca/en/aijiaManagement"
+      }
+    }
+  ]
+}

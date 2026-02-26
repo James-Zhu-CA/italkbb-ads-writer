@@ -7,7 +7,7 @@
 - 接到需求先做 Step 0 计划，未完成 Step 0 不得进行官网检索。
 - Step 0 与 Step 7 为必选步骤，必须有对应文档文件。
 - Step 1 到 Step 6 根据 Step 0 计划按需执行；执行了的步骤必须有对应文档。
-- Step 7 必须二次抓取官网进行事实核查，不能只引用前面步骤文档。
+- Step 7 必须在当前 run 做官网事实核查；价格/优惠/原价/条款条件 claim 强制刷新官网，非价格功能类 claim 可复用 `<=7天` 缓存（仍不得只引用前面步骤文档）。
 - 对“点击套餐后才显示价格”的页面，必须执行变体遍历和变体级核查。
 
 ## 文档清单
@@ -62,14 +62,32 @@
 - 若用户明确要求核查 `italkbb.com`，必须在 Step 0 明确记录，并将 `.ca` 与 `.com` 的 claim/evidence 分开，不得混用。
 - Step 2 与 Step 7 若抓到白名单外 URL，不得用于事实结论；需标注 `domain_not_allowed`。
 
+## 锁定业务链接与缓存（强制，适用于清单内业务）
+
+- 对 `references/business-url-registry.json` 中列出的业务，Step 0 与 Step 1 不再搜索产品页 URL。
+- 必须使用 registry 中的 `business_id + locale` 选择官网链接。
+- `chs` 链接为锁定入口；`cht/en` 允许从 `chs` 页面语言切换自动发现并回填 registry。
+- 官网资料缓存目录固定为项目根目录：`business_info/`。
+- 使用 `scripts/business_info_cache.py` 执行抓取与缓存判定。
+- 缓存 TTL 默认 7 天：
+  - `<=7天`：Step 2 可直接复用缓存
+  - `>7天`：必须刷新官网并更新缓存
+- Step 7 混合新鲜度策略（方案1）：
+  - 价格/优惠/原价/条款条件 claim：强制刷新官网（不得只用缓存）
+  - 功能/规格/一般描述 claim：可复用 `<=7天` 缓存
+- `monthly_promotion` 仅为促销辅助来源；若与业务页价格冲突，必须标记 `price_conflict` 并提示，不得自动改写已生成文案。
+
 ## Step 0 规划约束（强制）
 
 - 在 `step0-plan.md` 明确：
   - 本次需求与目标
   - Step 1-6 中哪些要执行、哪些跳过、原因
   - 每一步需要读取的文档和依赖关系
+  - 是否命中锁定业务 registry（`yes/no`）
+  - 若命中：`business_id`、locale、registry URL
   - 计划抓取的官网 URL 列表
   - 允许的事实域名白名单（默认 `www.italkbb.ca`）
+  - 缓存根目录（`business_info/`）与缓存策略摘要（7天 TTL + Step 7 价格强制刷新）
   - 计划使用的工具/手段（search/open/curl 等）
   - 页面展示类型判断（`static` 或 `interactive-variant`）
   - 若为 `interactive-variant`，列出 Step 2 和 Step 7 的变体遍历方案
@@ -88,6 +106,7 @@
 
 - Step 1 允许：
   - 确认平台、产品、canonical URL、目标人群、输出数量
+  - 命中锁定业务时，从 `references/business-url-registry.json` 映射 canonical/辅助 URL（不走搜索发现）
   - 每个候选 URL 做一次可达性检查
 - Step 1 禁止：
   - 价格抽取
@@ -107,6 +126,8 @@ Step 2 前半段必须完成并落盘：
 - 页面类型最终判定（`static` 或 `interactive-variant`）
 - 判定结果一旦写入 `step2-facts.md`，后续步骤不得改口径
 - 域名白名单执行结果（是否出现 `domain_not_allowed` 拒绝项）
+- 锁定业务缓存执行结果（`hit` / `miss` / `stale_refresh`）
+- 若命中锁定业务：记录 `business_info/` 缓存路径与 `meta.json` 时间戳
 
 进入 Step 3 前，Step 2 必须把官网事实分为：
 
@@ -129,9 +150,13 @@ Step 2 必须新增 `Fetch Dedup Log`，字段至少包括：
 - `fetched_at`
 - `purpose`
 - `allowed domain check` (`pass` / `fail`)
+- `cache status` (`hit` / `miss` / `stale_refresh`)
+- `cache file path`（如使用缓存）
 
 同一步内不得对同一 URL 以同一 purpose 重复抓取；若因超时或 5xx 重试，需在日志写明原因。
 白名单外 URL 可抓取用于排除/对比记录，但不得进入事实结论与 claim 证据。
+
+若命中锁定业务，优先通过 `scripts/business_info_cache.py` 获取/更新官网快照，再基于缓存内容做事实提取；必要时再补充定向官网抓取。
 
 Nuxt/JS 反查仅在以下条件同时满足时允许：
 
@@ -447,7 +472,10 @@ Attention:
 
 文档要求（强制）：
 
-- 必须重新抓取官网最新页面内容进行比对。
+- 必须在当前 run 获取官网证据进行比对（混合新鲜度策略）：
+  - 价格/优惠/原价/条款条件 claim：强制刷新官网
+  - 功能/规格/一般描述 claim：可复用 `<=7天` 的 `business_info/` 缓存
+  - 缓存超过 7 天：必须刷新官网并更新缓存
 - 不得仅引用 Step 2 到 Step 6 文档作为最终证据。
 - 复核清单来源采用弹性规则：
   - 若 Step 6 存在且有 claim 清单，则按 Step 6 清单复核。
@@ -455,12 +483,15 @@ Attention:
 - 根据 claim 清单构建“定向复抓 URL 集”，仅抓取核验该批 claim 所需 URL。
 - 禁止在 Step 7 做全站扩散搜索。
 - 默认仅允许 `www.italkbb.ca` 进入复核 URL 集；白名单外 URL 需拒绝并记录 `domain_not_allowed`。
+- 命中锁定业务时，优先通过 `scripts/business_info_cache.py` 获取/更新 `business_info/` 缓存，再按 claim 类型决定是否强制刷新官网。
 - 证据冲突时使用统一优先级：`产品 canonical 页 > 产品变体 payload/endpoint > promotion 页 > legal/其他页`。
+- 若 `monthly_promotion` 与业务页价格/条件冲突：必须标记 `price_conflict`，保留原文案不自动改写，并在 Step 7 输出冲突提示。
 - 必须输出 `### Step7 Fetch Dedup Log`，字段至少包含：`URL`、`fetched_at`、`purpose`、`retry_count`、`retry_reason`。
-- 建议增加字段：`allowed domain check`（`pass/fail`）。
+- 必须增加字段：`allowed domain check`（`pass/fail`）、`cache status`、`cache file path`、`freshness basis`。
 - 同一步内不得对同一 URL 同一 purpose 重复抓取；若超时/5xx，可重试但需入日志。
 - 重试策略：超时或 5xx 最多重试 2 次。
 - 逐条核查复核清单中的每个事实主张。
+- 价格类 claim 的证据必须来自本次强制刷新结果；不得用旧缓存替代。
 - 增加语种一致性核查：文案语种/字体系必须与 Step 3 对应人群的语种锁定一致。
 - 增加语言本地化审计：按 Step 3 `Language Localization Profile` 检查词汇地域性、语气正式度、标点与句式风格是否一致（Step 7 只审计，不负责主写）。
 - 对 `interactive-variant` 页面，必须先切到对应变体状态，再核查该条主张。
@@ -511,9 +542,20 @@ Attention:
   - `fetched_at`（含时区）
   - `status` (`verified` / `not found` / `mismatch`)
   - `action taken`
+- 若存在冲突或不匹配，必须额外输出 `### Conflict Notice`（表格），字段至少包含：
+  - `claim_id`（如有）
+  - `claim`
+  - `conflict type`（如 `price_conflict` / `variant_mismatch` / `not_found` / `language_mismatch`）
+  - `affected output section`（Step 6 asset/slot/line）
+  - `evidence source A`
+  - `evidence source B`（若无则填 `N/A`）
+  - `recommended handling`（例如“人工确认后再改稿”/“删除该 claim”）
+  - `user-visible warning message`
 - 禁止以 `segment background` 替代 `persona_id` / `behavior archetype` 作为核查主键。
 - 若存在 `not found` 或 `mismatch`：
-  - 有 Step 6 时：先修改 Step 6，再重新执行 Step 7。
-  - 无 Step 6 时：输出修正文案建议，并基于修正后 claim 重新执行 Step 7。
-- 若本地化审计 fail：先回到 Step 6 修正文案，再重新执行 Step 7；Step 7 不直接重写整段文案。
-- Step 7 自动复核回路最多执行 2 轮；仍未解决的条目标记为 `manual review required`。
+  - 不得在 Step 7 自动修改已生成文案（包括 Step 6 文案与视觉叠字）
+  - 保留原文案并输出冲突提示 / 风险说明
+  - 将未解决条目标记为 `manual review required`
+  - 仅在用户明确要求修订时，才回到 Step 6 改稿并再次执行 Step 7
+- 若本地化审计 fail：Step 7 仅输出本地化问题与修订建议，不直接重写整段文案。
+- Step 7 不因内容冲突自动重跑；仅允许在同一轮内对超时/5xx 执行最多 2 次重试。
