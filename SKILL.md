@@ -209,6 +209,12 @@ For steps with price claims on interactive pages, add:
   - wording avoid list (cross-region or unnatural terms to avoid)
   - punctuation and formatting conventions
   - sentence rhythm/style notes (short/direct vs narrative/warm)
+- Default locale/style rule when user does not explicitly specify writing style:
+  - Hong Kong audience persona -> HK-style ad wording and tone
+  - Taiwan audience persona -> TW-style ad wording and tone
+  - Mainland audience persona -> Mainland-style ad wording and tone
+  - North America English audience persona -> North America English ad wording and tone
+  - If regional style is ambiguous, infer from Step 3 language/cultural background + scenario context, and record the rationale in `Language Localization Profile`.
 - Do not mix Traditional Chinese, Simplified Chinese, and English in one persona output package.
 - If Step 1 has preferred segment, include it as a priority candidate in Step 3 comparison; do not auto-select it as core.
 - If Step 3 is selected, Step 6 language lock and localization rules must follow Step 3 selected persona(s). For multi-persona output, generate one language-locked package per persona.
